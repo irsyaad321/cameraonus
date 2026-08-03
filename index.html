@@ -8,7 +8,26 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
     <style>
         :root { --primary-font: 'Poppins', sans-serif; --primary-color: #d946ef; }
-        body { font-family: var(--primary-font); background-color: #f3f4f6; }
+        body { 
+    font-family: var(--primary-font); 
+    /* 1. Ganti URL di bawah dengan link foto destinasi atau event Anda */
+    background-image: url('https://collection.cloudinary.com/yhhytd9r/c899421ad9165bb6b3711f6b9b07a764'); 
+    
+    /* 2. Ini agar foto meregang menutupi seluruh layar tanpa terpotong aneh */
+    background-size: cover; 
+    
+    /* 3. Ini agar posisi foto selalu berada di tengah layar */
+    background-position: center; 
+    
+    /* 4. Ini agar saat di-scroll, fotonya tetap diam (elegan) */
+    background-attachment: fixed; 
+}
+
+/* 5. Trik Tambahan: Membuat kotak putih di tengah menjadi sedikit transparan (Efek Kaca/Glassmorphism) agar background tetap mengintip indah */
+.bg-white {
+    background-color: rgba(255, 255, 255, 0.85) !important;
+    backdrop-filter: blur(8px);
+}
         .btn-gradient { background: linear-gradient(135deg, #d946ef, #8b5cf6); color: white; transition: all 0.2s; }
         .btn-gradient:active { transform: scale(0.95); }
         /* Animasi notifikasi latar belakang */
