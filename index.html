@@ -9,14 +9,17 @@
     <style>
         :root { --primary-font: 'Poppins', sans-serif; --primary-color: #d946ef; }
         body { font-family: var(--primary-font); background-color: #f3f4f6; }
-        .btn-gradient { background: linear-gradient(135deg, #d946ef, #8b5cf6); color: white; transition: transform 0.2s; }
+        .btn-gradient { background: linear-gradient(135deg, #d946ef, #8b5cf6); color: white; transition: all 0.2s; }
         .btn-gradient:active { transform: scale(0.95); }
+        /* Animasi notifikasi latar belakang */
+        .toast-enter { transform: translateY(0); opacity: 1; }
+        .toast-exit { transform: translateY(150%); opacity: 0; }
     </style>
 </head>
-<body class="flex items-center justify-center min-h-screen p-4">
-    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+<body class="flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md relative z-10">
         <h2 class="text-2xl font-bold text-center mb-2" style="color: var(--primary-color);">Bagikan Momen!</h2>
-        <p class="text-center text-gray-500 text-sm mb-6">Jepret foto terbaikmu di acara ini</p>
+        <p class="text-center text-gray-500 text-sm mb-6">Jepret momen terbaik tanpa henti</p>
 
         <div class="space-y-4">
             <div>
@@ -31,31 +34,42 @@
             <!-- Input Kamera Tersembunyi -->
             <input type="file" id="kamera" accept="image/*" capture="environment" style="display: none;">
 
-            <button id="btnKamera" class="w-full btn-gradient py-3 rounded-xl font-bold text-lg shadow-lg flex justify-center items-center gap-2">
+            <!-- Tombol Kamera Utama -->
+            <button id="btnKamera" class="w-full btn-gradient py-4 rounded-xl font-bold text-lg shadow-lg flex justify-center items-center gap-2">
                 📸 Buka Kamera & Jepret
             </button>
             
-            <div id="statusArea" class="text-center mt-4 hidden">
-                <p id="statusText" class="text-sm font-semibold text-gray-600 animate-pulse">Mengunggah foto, mohon tunggu...</p>
-            </div>
-            
-            <button id="btnGaleri" onclick="window.location.href='galeri.html'" class="w-full bg-gray-900 text-white py-3 rounded-xl font-bold mt-4 hidden">
-                ✅ Selesai & Lihat Galeri
+            <!-- Tombol Menuju Galeri -->
+            <button id="btnGaleri" onclick="window.location.href='galeri.html'" class="w-full bg-gray-900 text-white py-3 rounded-xl font-bold mt-4">
+                Lihat Galeri Publik ➔
             </button>
         </div>
     </div>
 
-   <script>
-        // MASUKKAN DATA CLOUDINARY DAN GOOGLE ANDA DISINI:
+    <!-- Floating Toast (Notifikasi Latar Belakang) -->
+    <div id="uploadToast" class="fixed bottom-6 left-1/2 transform -translate-x-1/2 w-11/12 max-w-sm bg-gray-900 text-white px-5 py-4 rounded-2xl shadow-2xl transition-all duration-500 toast-exit z-50 flex justify-between items-center">
+        <div>
+            <p class="font-bold text-sm">Proses Latar Belakang...</p>
+            <p id="toastStatus" class="text-xs text-gray-300">Menyimpan 1 foto ke galeri</p>
+        </div>
+        <div id="toastSpinner" class="animate-spin rounded-full h-5 w-5 border-t-2 border-purple-400"></div>
+    </div>
+
+    <script>
+        // MASUKKAN KUNCI ANDA DISINI
         const CLOUD_NAME = "yhhytd9r"; 
-        const UPLOAD_PRESET = "galeri_event"; // contoh: galeri_event
+        const UPLOAD_PRESET = "galeri_event"; 
         const GAS_URL = "https://script.google.com/macros/s/AKfycbyq4fF20KiPeJ_ZqzjFGJ69SMHeZKnJB9chTREfl49akfGeBs4QTCl5SSraHqDifsxUhQ/exec";
 
         const btnKamera = document.getElementById('btnKamera');
         const inputKamera = document.getElementById('kamera');
-        const statusArea = document.getElementById('statusArea');
-        const statusText = document.getElementById('statusText');
-        const btnGaleri = document.getElementById('btnGaleri');
+        const toast = document.getElementById('uploadToast');
+        const toastStatus = document.getElementById('toastStatus');
+        const toastSpinner = document.getElementById('toastSpinner');
+        
+        // Sistem Antrean (Queue)
+        let uploadQueue = [];
+        let isUploading = false;
 
         btnKamera.addEventListener('click', () => {
             if(!document.getElementById('nama').value) {
@@ -65,62 +79,90 @@
             inputKamera.click();
         });
 
-        inputKamera.addEventListener('change', async (e) => {
+        // Ketika tamu selesai menjepret 1 foto
+        inputKamera.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
 
-            btnKamera.style.display = 'none';
-            statusArea.style.display = 'block';
+            // 1. Masukkan ke Antrean Memori
+            uploadQueue.push({
+                file: file,
+                nama: document.getElementById('nama').value,
+                pesan: document.getElementById('pesan').value
+            });
 
-            try {
-                // 1. Kompresi Gambar
-                statusText.innerText = "Mengompresi gambar (Kualitas Premium)...";
-                const compressedBase64 = await compressImage(file);
+            // 2. Kosongkan kamera seketika agar tamu bisa langsung jepret lagi
+            inputKamera.value = "";
+            
+            // 3. Beri umpan balik visual instan di tombol
+            const teksAsli = btnKamera.innerHTML;
+            btnKamera.innerHTML = "✅ Tersimpan! Jepret Lagi";
+            btnKamera.style.background = "#10b981"; // Warna hijau sukses
+            
+            setTimeout(() => {
+                btnKamera.innerHTML = teksAsli;
+                btnKamera.style.background = ""; // Kembali ke warna gradien
+            }, 1500);
 
-                // 2. Upload ke Cloudinary (Server Enterprise Anti-Blokir)
-                statusText.innerText = "Mengunggah ke server aman...";
-                const formData = new FormData();
-                formData.append('file', compressedBase64);
-                formData.append('upload_preset', UPLOAD_PRESET);
-                
-                const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
-                    method: 'POST',
-                    body: formData
-                });
-                const cloudinaryData = await cloudinaryRes.json();
-                
-                if (!cloudinaryData.secure_url) throw new Error("Gagal upload ke Cloudinary");
-                
-                const publicImageUrl = cloudinaryData.secure_url; // URL Publik dari Cloudinary
-
-                // 3. Simpan Data ke Google Sheets (beserta instruksi Backup ke Drive)
-                statusText.innerText = "Menyimpan ke buku tamu & arsip Drive...";
-                const payload = {
-                    nama: document.getElementById('nama').value,
-                    pesan: document.getElementById('pesan').value,
-                    url: publicImageUrl
-                };
-
-                await fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'text/plain' },
-                    body: JSON.stringify(payload)
-                });
-
-                statusText.innerText = "Foto berhasil diunggah!";
-                statusText.classList.remove('animate-pulse', 'text-gray-600');
-                statusText.classList.add('text-green-600');
-                btnGaleri.style.display = 'block';
-
-            } catch (error) {
-                console.error(error);
-                statusText.innerText = "Terjadi kesalahan koneksi. Silakan muat ulang.";
-                statusText.classList.remove('animate-pulse');
-                statusText.classList.add('text-red-500');
-                btnKamera.style.display = 'flex';
+            // 4. Jalankan pekerja latar belakang (jika belum berjalan)
+            if(!isUploading) {
+                jalankanPekerjaLatarBelakang();
             }
         });
+
+        async function jalankanPekerjaLatarBelakang() {
+            isUploading = true;
+            toast.classList.remove('toast-exit');
+            toast.classList.add('toast-enter');
+            toastSpinner.style.display = 'block';
+
+            while(uploadQueue.length > 0) {
+                toastStatus.innerText = `Mengunggah ${uploadQueue.length} foto tersisa...`;
+                
+                const item = uploadQueue[0]; // Ambil data paling depan di antrean
+                
+                try {
+                    // Proses berat berjalan senyap disini
+                    const compressedBase64 = await compressImage(item.file);
+                    const formData = new FormData();
+                    formData.append('file', compressedBase64);
+                    formData.append('upload_preset', UPLOAD_PRESET);
+                    
+                    const cloudinaryRes = await fetch(`https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const cloudinaryData = await cloudinaryRes.json();
+                    
+                    if (cloudinaryData.secure_url) {
+                        const payload = { nama: item.nama, pesan: item.pesan, url: cloudinaryData.secure_url };
+                        // Kirim ke Google senyap
+                        await fetch(GAS_URL, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify(payload)
+                        });
+                    }
+                } catch (error) {
+                    console.error("Gagal 1 foto", error);
+                }
+                
+                // Buang data dari antrean setelah selesai diproses
+                uploadQueue.shift(); 
+            }
+            
+            // Jika antrean sudah habis
+            toastStatus.innerText = "Semua foto berhasil masuk galeri!";
+            toastSpinner.style.display = 'none';
+            
+            // Sembunyikan notifikasi setelah 3 detik
+            setTimeout(() => {
+                toast.classList.remove('toast-enter');
+                toast.classList.add('toast-exit');
+                isUploading = false;
+            }, 3000);
+        }
 
         function compressImage(file) {
             return new Promise((resolve) => {
@@ -144,3 +186,5 @@
             });
         }
     </script>
+</body>
+</html>
