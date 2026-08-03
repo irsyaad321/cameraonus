@@ -96,7 +96,7 @@
             
             // 3. Beri umpan balik visual instan di tombol
             const teksAsli = btnKamera.innerHTML;
-            btnKamera.innerHTML = "✅ Tersimpan! Jepret Lagi";
+            btnKamera.innerHTML = "✅ Tersimpan! Tunggu";
             btnKamera.style.background = "#10b981"; // Warna hijau sukses
             
             setTimeout(() => {
@@ -153,7 +153,7 @@
             }
             
             // Jika antrean sudah habis
-            toastStatus.innerText = "Semua foto berhasil masuk galeri!";
+            toastStatus.innerText = "Semua foto berhasil masuk galeri, yuk cek!";
             toastSpinner.style.display = 'none';
             
             // Sembunyikan notifikasi setelah 3 detik
@@ -161,7 +161,7 @@
                 toast.classList.remove('toast-enter');
                 toast.classList.add('toast-exit');
                 isUploading = false;
-            }, 3000);
+            }, 10000);
         }
 
         function compressImage(file) {
